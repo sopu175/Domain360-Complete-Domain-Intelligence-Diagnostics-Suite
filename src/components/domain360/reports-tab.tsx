@@ -10,6 +10,7 @@ import type { HistoryItem, OverviewResult } from '@/lib/domain360/types';
 
 export function ReportsTab() {
   const domain = useStore((s) => s.domain);
+  const runScan = useStore((s) => s.runScan);
   const [items, setItems] = useState<HistoryItem[] | null>(null);
   const [error, setError] = useState<string | undefined>();
   const overview = useModuleData<'overview'>('overview');
@@ -18,6 +19,7 @@ export function ReportsTab() {
 
   useEffect(() => {
     let cancelled = false;
+    setError(undefined);
     apiFetch<{ items: HistoryItem[] }>(API.history())
       .then((data) => {
         if (!cancelled) setItems(data.items);
@@ -31,6 +33,7 @@ export function ReportsTab() {
   }, [reloadTick]);
 
   const load = useCallback(() => {
+    setError(undefined);
     setItems(null);
     setReloadTick((t) => t + 1);
   }, []);
@@ -47,10 +50,14 @@ export function ReportsTab() {
 
   const exportJson = () => {
     if (!domain) return;
+    const norm = domain.toLowerCase();
     const payload: Record<string, unknown> = { domain, generatedAt: new Date().toISOString() };
+    const state = useStore.getState();
     for (const m of ['overview', 'dns', 'propagation', 'nameservers', 'ip', 'ssl', 'whois', 'email', 'http', 'security', 'subdomains', 'dnssec']) {
-      const entry = useStore.getState().modules[`${m}:${domain}:`];
-      if (entry?.status === 'ok') payload[m] = entry.data;
+      const matchKey = Object.keys(state.modules).find((k) => k.startsWith(`${m}:${norm}:`));
+      if (matchKey && state.modules[matchKey]?.status === 'ok') {
+        payload[m] = state.modules[matchKey].data;
+      }
     }
     download(JSON.stringify(payload, null, 2), `domain360-${domain}.json`, 'application/json');
   };
@@ -140,8 +147,17 @@ export function ReportsTab() {
               </thead>
               <tbody>
                 {items.map((i) => (
-                  <tr key={i.id} className="border-t hover:bg-muted/40">
-                    <td className="px-3 py-2 font-mono text-[13px]">{i.domain}</td>
+                  <tr key={i.id} className="border-t transition-colors hover:bg-muted/40">
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => void runScan(i.domain)}
+                        className="font-mono text-[13px] font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+                        title={`Load scan for ${i.domain}`}
+                      >
+                        {i.domain}
+                      </button>
+                    </td>
                     <td className="px-3 py-2">
                       {i.score !== null ? (
                         <span className="flex items-center gap-2">
@@ -152,9 +168,25 @@ export function ReportsTab() {
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{new Date(i.createdAt).toLocaleString()}</td>
                     <td className="px-3 py-2 text-right">
-                      <Button variant="ghost" size="sm" aria-label="Delete history entry" onClick={() => deleteItem(i.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => void runScan(i.domain)}
+                        >
+                          Load
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-500"
+                          aria-label="Delete history entry"
+                          onClick={() => deleteItem(i.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

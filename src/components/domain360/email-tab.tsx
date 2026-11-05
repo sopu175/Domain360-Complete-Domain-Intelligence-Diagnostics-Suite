@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Mail } from 'lucide-react';
 import {
-  DataTable, FindingList, InfoGrid, ModuleShell, ScoreRing, SectionCard, StatusBadge, type TableColumn,
+  DataTable, FindingList, InfoGrid, IpBadge, ModuleShell, ScoreRing, SectionCard, StatusBadge, flagEmoji, type TableColumn,
 } from '@/components/domain360/shared-ui';
 import { useModuleData } from '@/lib/domain360/store';
 import type { EmailResult } from '@/lib/domain360/types';
@@ -17,12 +17,13 @@ export function EmailTab() {
   const result = data as EmailResult | undefined;
 
   const mxColumns: TableColumn[] = [
-    { key: 'priority', header: 'Priority', className: 'w-20 tabular-nums' },
-    { key: 'exchange', header: 'Mail exchanger', mono: true },
-    { key: 'ips', header: 'IP addresses', mono: true },
-    { key: 'ptr', header: 'Reverse DNS', mono: true },
-    { key: 'provider', header: 'Provider' },
-    { key: 'smtp', header: 'SMTP :25', className: 'w-28' },
+    { key: 'priority', header: 'Priority', className: 'w-16 tabular-nums' },
+    { key: 'exchange', header: 'Mail exchanger', mono: true, className: 'min-w-[220px]' },
+    { key: 'ips', header: 'IP addresses', className: 'min-w-[190px]' },
+    { key: 'location', header: 'Location / Country', className: 'min-w-[160px]' },
+    { key: 'ptr', header: 'Reverse DNS', mono: true, className: 'min-w-[170px]' },
+    { key: 'provider', header: 'Provider', className: 'min-w-[130px]' },
+    { key: 'smtp', header: 'SMTP :25', className: 'min-w-[140px]' },
   ];
 
   return (
@@ -81,7 +82,25 @@ export function EmailTab() {
                 _key: `${m.priority}-${m.exchange}`,
                 priority: m.priority,
                 exchange: m.exchange,
-                ips: m.ips.map((i) => i.ip).join(', ') || '—',
+                ips: m.ips.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {m.ips.map((i) => (
+                      <IpBadge key={i.ip} ip={i.ip} version={i.version} />
+                    ))}
+                  </div>
+                ) : (
+                  '—'
+                ),
+                location: m.countryCode || m.country ? (
+                  <div className="flex items-center gap-1.5 text-xs font-medium">
+                    <span className="text-base leading-none">{flagEmoji(m.countryCode)}</span>
+                    <span className="truncate max-w-[160px]">
+                      {m.city ? `${m.city}, ` : ''}{m.country || m.countryCode}
+                    </span>
+                  </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                ),
                 ptr: m.ptr || '—',
                 provider: m.providerGuess || '—',
                 smtp: m.reachable === null

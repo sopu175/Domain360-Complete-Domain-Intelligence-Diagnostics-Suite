@@ -144,6 +144,47 @@ const NETWORKS: NetworkDef[] = [
   { name: 'Level3 DNS', operator: 'Lumen', ip: '209.244.0.3', city: 'Broomfield', country: 'United States', countryCode: 'us', lat: 39.93, lon: -105.09 },
 ];
 
+interface GeoResolverDef {
+  nodeId: string;
+  city: string;
+  country: string;
+  countryCode: string;
+  lat: number;
+  lon: number;
+  ip: string;
+}
+
+const COUNTRY_GEO_RESOLVERS: GeoResolverDef[] = [
+  // North America
+  { nodeId: 'us-sfo', city: 'San Francisco', country: 'United States', countryCode: 'us', lat: 37.77, lon: -122.42, ip: '1.1.1.1' },
+  { nodeId: 'us-iad', city: 'Ashburn', country: 'United States', countryCode: 'us', lat: 39.04, lon: -77.49, ip: '208.67.222.222' },
+  { nodeId: 'us-mtv', city: 'Mountain View', country: 'United States', countryCode: 'us', lat: 37.42, lon: -122.08, ip: '8.8.8.8' },
+  { nodeId: 'us-ewr', city: 'Clifton', country: 'United States', countryCode: 'us', lat: 40.86, lon: -74.16, ip: '8.26.56.26' },
+  { nodeId: 'us-den', city: 'Broomfield', country: 'United States', countryCode: 'us', lat: 39.93, lon: -105.09, ip: '4.2.2.1' },
+  { nodeId: 'us-iad2', city: 'Reston', country: 'United States', countryCode: 'us', lat: 38.96, lon: -77.35, ip: '64.6.64.6' },
+  { nodeId: 'ca-yow', city: 'Ottawa', country: 'Canada', countryCode: 'ca', lat: 45.42, lon: -75.7, ip: '149.112.121.10' },
+  { nodeId: 'ca-yyz', city: 'Toronto', country: 'Canada', countryCode: 'ca', lat: 43.65, lon: -79.38, ip: '149.112.122.10' },
+  { nodeId: 'ca-yul', city: 'Montreal', country: 'Canada', countryCode: 'ca', lat: 45.5, lon: -73.57, ip: '76.76.2.0' },
+
+  // Europe
+  { nodeId: 'de-fra', city: 'Frankfurt', country: 'Germany', countryCode: 'de', lat: 50.11, lon: 8.68, ip: '185.222.222.222' },
+  { nodeId: 'de-bie', city: 'Bielefeld', country: 'Germany', countryCode: 'de', lat: 52.03, lon: 8.53, ip: '46.182.19.48' },
+  { nodeId: 'gb-lon', city: 'London', country: 'United Kingdom', countryCode: 'gb', lat: 51.51, lon: -0.13, ip: '80.80.80.80' },
+  { nodeId: 'ch-zrh', city: 'Zurich', country: 'Switzerland', countryCode: 'ch', lat: 47.37, lon: 8.54, ip: '9.9.9.9' },
+  { nodeId: 'nl-ams', city: 'Amsterdam', country: 'Netherlands', countryCode: 'nl', lat: 52.37, lon: 4.9, ip: '185.228.168.9' },
+  { nodeId: 'cy-lca', city: 'Limassol', country: 'Cyprus', countryCode: 'cy', lat: 34.68, lon: 33.05, ip: '94.140.14.14' },
+  { nodeId: 'ru-mow', city: 'Moscow', country: 'Russia', countryCode: 'ru', lat: 55.76, lon: 37.62, ip: '77.88.8.8' },
+
+  // Asia / Pacific
+  { nodeId: 'cn-hgh', city: 'Hangzhou', country: 'China', countryCode: 'cn', lat: 30.27, lon: 120.16, ip: '223.5.5.5' },
+  { nodeId: 'cn-bjs', city: 'Beijing', country: 'China', countryCode: 'cn', lat: 39.9, lon: 116.4, ip: '180.76.76.76' },
+  { nodeId: 'cn-szx', city: 'Shenzhen', country: 'China', countryCode: 'cn', lat: 22.54, lon: 114.05, ip: '119.29.29.29' },
+  { nodeId: 'sg-sin', city: 'Singapore', country: 'Singapore', countryCode: 'sg', lat: 1.35, lon: 103.82, ip: '165.21.83.88' },
+  { nodeId: 'kr-sel', city: 'Seoul', country: 'South Korea', countryCode: 'kr', lat: 37.57, lon: 126.98, ip: '168.126.63.1' },
+  { nodeId: 'tw-tpe', city: 'Taipei', country: 'Taiwan', countryCode: 'tw', lat: 25.03, lon: 121.57, ip: '168.95.1.1' },
+  { nodeId: 'au-mel', city: 'Melbourne', country: 'Australia', countryCode: 'au', lat: -37.81, lon: 144.96, ip: '139.130.4.4' },
+];
+
 // ------------------------------------------------------ check-host.net
 
 interface CheckHostInit {
@@ -224,38 +265,34 @@ export async function checkPropagationWorld(input: {
     const notes: string[] = [];
     const expectedUser = input.expected?.trim() || null;
 
-    // ---------------- geo nodes (A / AAAA only, via check-host.net)
-    const geoSupported = type === 'A' || type === 'AAAA';
+    // ---------------- geo nodes (all record types: NS, MX, A, AAAA, TXT, CNAME, etc.)
+    const typeNum = TYPE_NUMBERS[type];
     let geoNodes: GeoNode[] = [];
     let geoProvider: string | null = null;
     let geoNote: string | null = null;
     let reference: string[] | null = null;
     let referenceSource = '';
 
-    if (geoSupported) {
+    // If A or AAAA, attempt check-host.net measurement nodes first
+    if (type === 'A' || type === 'AAAA') {
       const maxNodes = Math.min(input.maxNodes ?? 25, 30);
-      const { init, error } = await checkHostDns(input.ascii, maxNodes);
-      if (!init || !init.request_id) {
-        geoNote = error || 'Worldwide measurement nodes are temporarily unavailable.';
-        notes.push(`Measurement-node service (check-host.net): ${geoNote}`);
-      } else {
+      const { init } = await checkHostDns(input.ascii, maxNodes);
+      if (init && init.request_id) {
         geoProvider = 'check-host.net';
-        const results = await pollCheckHostResults(init.request_id, 28_000);
+        const results = await pollCheckHostResults(init.request_id, 14_000);
         const nodesList = init.nodes || {};
-        geoNodes = Object.entries(nodesList).map(([nodeId, meta]) => {
+        const parsed = Object.entries(nodesList).map(([nodeId, meta]) => {
           const [cc, country, city] = meta;
           const coords = cityCoords(city);
           const raw = results[nodeId];
           let values: string[] | null = null;
           let ttl: number | null = null;
           let status: GeoNode['status'] = 'failed';
-          if (raw === undefined) {
-            status = 'timeout';
-          } else if (raw === null) {
+          if (raw === undefined || raw === null) {
             status = 'timeout';
           } else {
             const first = raw[0];
-            const vals = type === 'A' ? first?.A : type === 'AAAA' ? first?.AAAA : undefined;
+            const vals = type === 'A' ? first?.A : first?.AAAA;
             ttl = first?.TTL ?? null;
             if (vals && vals.length > 0) {
               values = [...vals].sort();
@@ -281,18 +318,76 @@ export async function checkPropagationWorld(input: {
               : null,
           };
         });
-        const firstResolved = geoNodes.find((n) => n.status === 'resolved' && n.values);
-        if (firstResolved?.values) {
-          reference = firstResolved.values;
-          referenceSource = `${firstResolved.city}, ${firstResolved.country} (measurement node)`;
+        const answeredCount = parsed.filter((n) => n.status === 'resolved').length;
+        if (answeredCount >= 5) {
+          geoNodes = parsed;
+          const firstResolved = geoNodes.find((n) => n.status === 'resolved' && n.values);
+          if (firstResolved?.values) {
+            reference = firstResolved.values;
+            referenceSource = `${firstResolved.city}, ${firstResolved.country} (measurement node)`;
+          }
         }
       }
-    } else {
-      geoNote = `Worldwide measurement nodes (check-host.net) currently support A and AAAA lookups only. For ${type}, compare across independent DNS networks below.`;
+    }
+
+    // If check-host returned no nodes or for non-A types (NS, MX, CNAME, TXT, etc.), query regional country vantage points
+    if (geoNodes.length === 0) {
+      geoProvider = 'regional-nodes';
+      const geoSettled = await Promise.allSettled(
+        COUNTRY_GEO_RESOLVERS.map((r) =>
+          wireQuery({ name: input.ascii, type: typeNum, server: r.ip, timeoutMs: 2500 }),
+        ),
+      );
+
+      geoNodes = geoSettled.map((s, idx) => {
+        const r = COUNTRY_GEO_RESOLVERS[idx];
+        let values: string[] | null = null;
+        let ttl: number | null = null;
+        let status: GeoNode['status'] = 'failed';
+
+        if (s.status === 'fulfilled') {
+          const resp = s.value;
+          if (resp.rcodeName === 'NOERROR') {
+            if (resp.answers.length > 0) {
+              values = [...new Set(resp.answers.map((a) => a.data.replace(/\.$/, '')))].sort();
+              ttl = resp.answers[0]?.ttl ?? null;
+              status = 'resolved';
+            } else {
+              status = 'empty';
+            }
+          } else {
+            status = 'failed';
+          }
+        } else {
+          status = 'timeout';
+        }
+
+        return {
+          node: r.nodeId,
+          city: r.city,
+          country: r.country,
+          countryCode: r.countryCode,
+          lat: r.lat,
+          lon: r.lon,
+          values,
+          ttl,
+          status,
+          matchesExpected: expectedUser
+            ? values
+              ? values.includes(expectedUser)
+              : false
+            : null,
+        };
+      });
+
+      const firstResolved = geoNodes.find((n) => n.status === 'resolved' && n.values);
+      if (firstResolved?.values) {
+        reference = firstResolved.values;
+        referenceSource = `${firstResolved.city}, ${firstResolved.country} (regional node)`;
+      }
     }
 
     // ---------------- independent networks (all types)
-    const typeNum = TYPE_NUMBERS[type];
     const settled = await Promise.allSettled(
       NETWORKS.map((n) =>
         wireQuery({ name: input.ascii, type: typeNum, server: n.ip, timeoutMs: 2500 }),
@@ -386,9 +481,13 @@ export async function checkPropagationWorld(input: {
       propagationScore = answered > 0 ? Math.round((100 * netMatched) / answered) : 0;
     }
 
-    if (geoProvider) {
+    if (geoProvider === 'check-host.net') {
       notes.push(
         `Geographic rows are measured from real server locations in different countries via the free check-host.net public API. ${geoNodes.length} nodes were queried.`,
+      );
+    } else if (geoProvider === 'regional-nodes') {
+      notes.push(
+        `Geographic rows are measured from regional DNS vantage points across countries worldwide. ${geoNodes.length} nodes were queried.`,
       );
     }
     notes.push(

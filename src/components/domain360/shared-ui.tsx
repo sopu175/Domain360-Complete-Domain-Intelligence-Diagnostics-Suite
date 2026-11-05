@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { Severity, StatusLevel } from '@/lib/domain360/types';
 
@@ -52,16 +53,219 @@ export function SeverityBadge({ severity }: { severity: Severity }) {
   );
 }
 
+export function flagEmoji(cc: string | undefined | null): string {
+  if (!cc || cc.length !== 2 || !/^[a-z]{2}$/i.test(cc)) return '🌐';
+  return cc.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
+}
+
+// ---------------------------------------------------------------- DNS Record & IP Badges
+
+export const DNS_RECORD_META: Record<string, { label: string; description: string; cls: string; dot: string }> = {
+  A: {
+    label: 'A Record (Address)',
+    description: 'Maps a hostname directly to a 32-bit IPv4 address (e.g. 192.0.2.1).',
+    cls: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30 hover:bg-blue-500/20',
+    dot: 'bg-blue-500',
+  },
+  AAAA: {
+    label: 'AAAA Record (IPv6 Address)',
+    description: 'Maps a hostname to a 128-bit IPv6 address (e.g. 2606:4700::6815:172d).',
+    cls: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30 hover:bg-indigo-500/20',
+    dot: 'bg-indigo-500',
+  },
+  CNAME: {
+    label: 'CNAME Record (Canonical Name)',
+    description: 'An alias that points this hostname to another domain name.',
+    cls: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30 hover:bg-purple-500/20',
+    dot: 'bg-purple-500',
+  },
+  MX: {
+    label: 'MX Record (Mail Exchange)',
+    description: 'Directs email to the mail servers responsible for accepting messages on this domain.',
+    cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20',
+    dot: 'bg-emerald-500',
+  },
+  TXT: {
+    label: 'TXT Record (Text)',
+    description: 'Holds machine-readable text used for SPF authentication, DKIM keys, DMARC policies, and verification tokens.',
+    cls: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20',
+    dot: 'bg-amber-500',
+  },
+  NS: {
+    label: 'NS Record (Name Server)',
+    description: 'Delegates authority for this DNS zone to authoritative nameservers.',
+    cls: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/30 hover:bg-teal-500/20',
+    dot: 'bg-teal-500',
+  },
+  SOA: {
+    label: 'SOA Record (Start of Authority)',
+    description: 'Zone administrative metadata: primary nameserver, admin email, zone serial, refresh, retry, and expire timers.',
+    cls: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30 hover:bg-rose-500/20',
+    dot: 'bg-rose-500',
+  },
+  CAA: {
+    label: 'CAA Record (Certificate Authority Authorization)',
+    description: 'Specifies which Certificate Authorities (CAs) are authorized to issue SSL/TLS certificates for this domain.',
+    cls: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/20',
+    dot: 'bg-cyan-500',
+  },
+  PTR: {
+    label: 'PTR Record (Pointer / Reverse DNS)',
+    description: 'Resolves an IP address back to its associated domain name (Reverse DNS lookup).',
+    cls: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-500/20',
+    dot: 'bg-violet-500',
+  },
+  SRV: {
+    label: 'SRV Record (Service)',
+    description: 'Specifies the hostname and port number for servers providing specific services (SIP, XMPP, LDAP).',
+    cls: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30 hover:bg-orange-500/20',
+    dot: 'bg-orange-500',
+  },
+  DNSKEY: {
+    label: 'DNSKEY Record (DNSSEC Key)',
+    description: 'Public cryptographic signing key used to validate DNSSEC RRSIG signatures.',
+    cls: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/20',
+    dot: 'bg-yellow-500',
+  },
+  DS: {
+    label: 'DS Record (Delegation Signer)',
+    description: 'Cryptographic digest of DNSKEY placed in the parent zone to establish the DNSSEC chain of trust.',
+    cls: 'bg-lime-500/10 text-lime-600 dark:text-lime-400 border-lime-500/30 hover:bg-lime-500/20',
+    dot: 'bg-lime-500',
+  },
+  RRSIG: {
+    label: 'RRSIG Record (DNSSEC Signature)',
+    description: 'Cryptographic digital signature securing a resource record set against DNS spoofing and cache poisoning.',
+    cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20',
+    dot: 'bg-emerald-500',
+  },
+  TLSA: {
+    label: 'TLSA Record (DANE)',
+    description: 'DANE association binding a certificate or public key to a service port.',
+    cls: 'bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400 border-fuchsia-500/30 hover:bg-fuchsia-500/20',
+    dot: 'bg-fuchsia-500',
+  },
+  HTTPS: {
+    label: 'HTTPS Record',
+    description: 'Provides transport parameters (HTTP/2, HTTP/3, ECH) and IP addresses for secure connections.',
+    cls: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-500/20',
+    dot: 'bg-sky-500',
+  },
+};
+
+export function DnsRecordBadge({
+  type,
+  showTooltip = true,
+  className,
+}: {
+  type: string;
+  showTooltip?: boolean;
+  className?: string;
+}) {
+  const upper = type.toUpperCase();
+  const meta = DNS_RECORD_META[upper] || {
+    label: `${upper} Record`,
+    description: `DNS resource record of type ${upper}.`,
+    cls: 'bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 border-zinc-500/30 hover:bg-zinc-500/20',
+    dot: 'bg-zinc-400',
+  };
+
+  const badge = (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 font-mono text-[11.5px] font-bold tracking-wide transition-colors select-none',
+        meta.cls,
+        className,
+      )}
+    >
+      <span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} />
+      {upper}
+    </span>
+  );
+
+  if (!showTooltip) return badge;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="cursor-help inline-block">{badge}</span>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-xs text-left">
+        <p className="font-semibold text-xs">{meta.label}</p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground leading-normal">{meta.description}</p>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export function IpBadge({
+  ip,
+  version,
+  copyable = true,
+  className,
+}: {
+  ip: string;
+  version?: 4 | 6;
+  copyable?: boolean;
+  className?: string;
+}) {
+  const isV6 = version === 6 || (version === undefined && ip.includes(':'));
+  const vLabel = isV6 ? 'IPv6' : 'IPv4';
+  const vCls = isV6
+    ? 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
+    : 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30';
+
+  return (
+    <div
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-muted/40 px-2 py-0.5 text-xs transition-colors hover:bg-muted/70',
+        className,
+      )}
+    >
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            className={cn(
+              'rounded px-1 py-0.2 font-mono text-[9.5px] font-bold uppercase tracking-wider border cursor-help select-none',
+              vCls,
+            )}
+          >
+            {vLabel}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          <p className="font-semibold">{isV6 ? 'Internet Protocol Version 6' : 'Internet Protocol Version 4'}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {isV6 ? '128-bit hexadecimal address' : '32-bit dot-decimal numerical address'}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+      <span className="font-mono text-[12px] font-medium tracking-tight text-foreground select-all">{ip}</span>
+      {copyable ? <CopyButton value={ip} ariaLabel={`Copy ${ip}`} className="h-5 w-5 p-0.5 shrink-0 text-muted-foreground hover:text-foreground" /> : null}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- copy
 
-export function CopyButton({ value, label, className }: { value: string; label?: string; className?: string }) {
+export function CopyButton({
+  value,
+  label,
+  ariaLabel,
+  className,
+}: {
+  value: string;
+  label?: string;
+  ariaLabel?: string;
+  className?: string;
+}) {
   const [copied, setCopied] = useState(false);
   return (
     <Button
       variant="ghost"
       size="sm"
       className={cn('h-7 px-2 text-xs text-muted-foreground hover:text-foreground', className)}
-      aria-label={label ? `Copy ${label}` : 'Copy value'}
+      aria-label={ariaLabel || (label ? `Copy ${label}` : 'Copy value')}
       onClick={async (e) => {
         e.stopPropagation();
         try {
@@ -223,7 +427,7 @@ export function DataTable({
           {rows.map((row) => (
             <tr key={row._key} className="border-t transition-colors hover:bg-muted/40">
               {columns.map((c) => (
-                <td key={c.key} className={cn('px-3 py-2 align-top', c.mono && 'font-mono text-[12.5px] break-all', c.className)}>
+                <td key={c.key} className={cn('px-3 py-2 align-top', c.mono && 'font-mono text-[12.5px] break-words [word-break:break-word]', c.className)}>
                   {row[c.key]}
                 </td>
               ))}

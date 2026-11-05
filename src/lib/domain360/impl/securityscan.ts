@@ -243,6 +243,72 @@ export async function scanSecurity(input: { ascii: string; authorizeAxfr?: boole
       if (!hasDmarc) findings.push(finding('email-no-dmarc', 'No DMARC record', 'medium', 'Receivers have no domain-owner policy for unauthenticated mail.', 'Publish a DMARC record.', 'https://datatracker.ietf.org/doc/html/rfc7489'));
     } catch { /* ignore */ }
 
+    // ---- DNSBL / Blacklist & Threat Reputation checks
+    const blacklists: SecurityResult['blacklists'] = {
+      checked: 0,
+      listed: 0,
+      entries: [],
+    };
+
+    try {
+      const hostIps = await resolveHostIps(input.ascii).catch(() => ({ v4: [], v6: [] }));
+      const targetIpv4 = hostIps.v4[0];
+      const reversedIp = targetIpv4 ? targetIpv4.split('.').reverse().join('.') : null;
+
+      const DNSBL_PROVIDERS = [
+        { name: 'Spamhaus ZEN', zone: 'zen.spamhaus.org', type: 'ip' },
+        { name: 'SpamCop BL', zone: 'bl.spamcop.net', type: 'ip' },
+        { name: 'Barracuda BRBL', zone: 'b.barracudacentral.org', type: 'ip' },
+        { name: 'SORBS DNSBL', zone: 'dnsbl.sorbs.net', type: 'ip' },
+        { name: 'Spamhaus DBL (Domain)', zone: 'dbl.spamhaus.org', type: 'domain' },
+      ];
+
+      await Promise.allSettled(
+        DNSBL_PROVIDERS.map(async (provider) => {
+          const queryHost = provider.type === 'ip'
+            ? (reversedIp ? `${reversedIp}.${provider.zone}` : null)
+            : `${input.ascii}.${provider.zone}`;
+
+          if (!queryHost) return;
+          blacklists.checked++;
+          try {
+            const res = await smartResolve(queryHost, 'A');
+            const isListed = res.rcode === 'NOERROR' && res.records.some((r) => r.type === 'A' && r.value.startsWith('127.0.0.'));
+            if (isListed) {
+              blacklists.listed++;
+              blacklists.entries.push({
+                name: provider.name,
+                host: queryHost,
+                listed: true,
+                details: res.records.map((r) => r.value).join(', '),
+              });
+              findings.push(
+                finding(
+                  `dnsbl:${provider.name}`,
+                  `Flagged on ${provider.name}`,
+                  'high',
+                  `${provider.type === 'ip' ? `Host IP (${targetIpv4})` : `Domain (${input.ascii})`} is actively listed on the ${provider.name} blacklist.`,
+                  'Inspect email delivery logs, remove spam or malware sources, and request delisting from the blacklist provider.',
+                ),
+              );
+            } else {
+              blacklists.entries.push({
+                name: provider.name,
+                host: queryHost,
+                listed: false,
+              });
+            }
+          } catch {
+            blacklists.entries.push({
+              name: provider.name,
+              host: queryHost,
+              listed: false,
+            });
+          }
+        }),
+      );
+    } catch { /* ignore blacklist query errors */ }
+
     // ---- score
     const weight: Record<Severity, number> = { critical: 25, high: 15, medium: 8, low: 3, info: 0, pass: 0 };
     const penalty = findings.reduce((acc, f) => acc + (weight[f.severity] || 0), 0);
@@ -261,6 +327,7 @@ export async function scanSecurity(input: { ascii: string; authorizeAxfr?: boole
       headersChecked,
       exposedFiles,
       zoneTransfer,
+      blacklists,
       findings,
       timestamp: new Date().toISOString(),
     };

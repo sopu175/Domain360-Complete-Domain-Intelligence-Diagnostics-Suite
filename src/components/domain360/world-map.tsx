@@ -29,7 +29,7 @@ export function pinColor(status: string, kind: 'geo' | 'network'): string {
 
 export default function WorldMap({ pins }: { pins: MapPin[] }) {
   return (
-    <div className="h-[340px] w-full overflow-hidden rounded-lg border sm:h-[400px]">
+    <div className="relative isolate z-0 h-[340px] w-full overflow-hidden rounded-lg border sm:h-[400px]">
       <MapContainer
         center={[28, 15]}
         zoom={2}

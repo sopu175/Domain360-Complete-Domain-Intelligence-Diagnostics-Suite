@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { CheckCircle2, Globe2, Info, Loader2, RefreshCw, Search, XCircle, XCircle as Failed } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Globe2, Info, Loader2, RefreshCw, Search, XCircle, XCircle as Failed } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  DataTable, EmptyState, ModuleShell, StatusBadge, type TableColumn,
+  DataTable, DNS_RECORD_META, EmptyState, ModuleShell, StatusBadge, type TableColumn,
 } from '@/components/domain360/shared-ui';
 import { useStore, useModuleData, type TabId } from '@/lib/domain360/store';
 import type { GeoNode, NetworkNode, PropagationWorldResult } from '@/lib/domain360/impl/propagation-geo';
@@ -103,7 +104,7 @@ export function PropagationTab() {
   return (
     <div className="space-y-4">
       {/* ---------- dnschecker-style search panel ---------- */}
-      <div className="rounded-xl border bg-card p-4">
+      <div className="rounded-xl border bg-card p-4 shadow-xs">
         <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
           <div className="flex flex-1 flex-col gap-2.5 sm:flex-row">
             <Input
@@ -118,8 +119,8 @@ export function PropagationTab() {
               value={expectedInput}
               onChange={(e) => setExpectedInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && submit()}
-              placeholder="Expected IP / value (optional)"
-              className="h-11 w-full font-mono text-sm sm:w-52"
+              placeholder="Expected value (optional)"
+              className="h-11 w-full font-mono text-sm sm:w-64"
               aria-label="Expected IP or value"
             />
           </div>
@@ -127,7 +128,7 @@ export function PropagationTab() {
             <Button
               onClick={() => submit()}
               disabled={loading}
-              className="h-11 bg-emerald-600 px-6 font-semibold text-white hover:bg-emerald-700"
+              className="h-11 shrink-0 bg-emerald-600 px-6 font-semibold text-white shadow-xs hover:bg-emerald-700"
             >
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
               Search
@@ -136,7 +137,7 @@ export function PropagationTab() {
               value={refreshMs}
               onChange={(e) => setRefreshMs(e.target.value)}
               aria-label="Auto refresh interval"
-              className="h-11 rounded-md border bg-background px-2 text-xs text-muted-foreground"
+              className="h-11 shrink-0 rounded-lg border border-input bg-background px-3 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-muted/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               {REFRESH_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -145,41 +146,59 @@ export function PropagationTab() {
           </div>
         </div>
 
-        {/* record type pills */}
+        {/* record type pills with tooltips & colored badges */}
         <div className="mt-3 flex flex-wrap gap-1.5" role="tablist" aria-label="Record type">
-          {TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => { setType(t); submit(undefined, t); }}
-              className={cn(
-                'rounded-md px-3.5 py-1.5 font-mono text-[13px] font-semibold transition-colors',
-                type === t
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'border text-muted-foreground hover:border-emerald-500/40 hover:text-emerald-600 dark:hover:text-emerald-400',
-              )}
-              aria-pressed={type === t}
-            >
-              {t}
-            </button>
-          ))}
+          {TYPES.map((t) => {
+            const meta = DNS_RECORD_META[t];
+            return (
+              <Tooltip key={t}>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setType(t);
+                      submit(undefined, t);
+                    }}
+                    className={cn(
+                      'rounded-lg px-3.5 py-1.5 font-mono text-[13px] font-semibold transition-all select-none cursor-pointer',
+                      type === t
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'border border-border/80 bg-background text-muted-foreground hover:border-emerald-500/50 hover:bg-muted/50 hover:text-foreground',
+                    )}
+                    aria-pressed={type === t}
+                  >
+                    {t}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-left">
+                  <p className="font-semibold text-xs">{meta?.label || `${t} Record`}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground leading-normal">
+                    {meta?.description || `Query DNS propagation for ${t} records.`}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
         </div>
 
         {result ? (
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t pt-3 text-xs text-muted-foreground">
+          <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t pt-3 text-xs text-muted-foreground">
             <span>
-              Checking <span className="font-mono font-semibold text-foreground">{result.domain}</span> · type {result.recordType}
+              Checking <span className="font-mono font-semibold text-foreground">{result.domain}</span> · type <span className="font-semibold text-foreground">{result.recordType}</span>
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-medium text-emerald-700 dark:text-emerald-300">
               <Globe2 className="h-3.5 w-3.5 text-emerald-500" />
               {result.summary.geoTotal > 0
                 ? `${result.summary.geoResolved}/${result.summary.geoTotal} locations resolved`
                 : `${result.summary.netMatched}/${result.summary.netTotal} networks answered`}
             </span>
             <span>
-              Propagation score: <span className={cn('font-bold', result.propagationScore >= 80 ? 'text-emerald-600 dark:text-emerald-400' : result.propagationScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500')}>{result.propagationScore}%</span>
+              Propagation score:{' '}
+              <span className={cn('font-bold', result.propagationScore >= 80 ? 'text-emerald-600 dark:text-emerald-400' : result.propagationScore >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500')}>
+                {result.propagationScore}%
+              </span>
             </span>
-            {result.expectedSource ? <span className="truncate">Reference: {result.expectedSource}</span> : null}
+            {result.expectedSource ? <span className="truncate text-muted-foreground">Reference: {result.expectedSource}</span> : null}
           </div>
         ) : null}
       </div>
@@ -198,10 +217,10 @@ export function PropagationTab() {
       >
         {result ? (
           <div className="space-y-4">
-            {/* map */}
-            <div className="relative">
+            {/* map with isolated stacking context */}
+            <div className="relative isolate z-0 overflow-hidden rounded-xl border bg-muted/20">
               <WorldMap pins={[...geoPins, ...netPins]} />
-              <div className="pointer-events-none absolute bottom-3 left-3 z-[500] flex flex-wrap gap-3 rounded-lg border bg-background/90 px-3 py-1.5 text-[11px] shadow-sm backdrop-blur">
+              <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex flex-wrap gap-2.5 rounded-lg border border-border/80 bg-background/90 px-3 py-1.5 text-[11px] font-medium shadow-xs backdrop-blur">
                 <LegendDot color="#10b981" label="Location resolved" />
                 <LegendDot color="#ef4444" label="Failed / no answer" />
                 <LegendDot color="#f59e0b" label="Divergent / timeout" />
@@ -211,8 +230,8 @@ export function PropagationTab() {
 
             {/* notes */}
             {result.notes.map((n, i) => (
-              <p key={i} className="flex items-start gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-[11.5px] leading-relaxed text-muted-foreground">
-                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <p key={i} className="flex items-start gap-2 rounded-lg border bg-muted/30 px-3.5 py-2.5 text-[12px] leading-relaxed text-muted-foreground">
+                <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 {n}
               </p>
             ))}
@@ -221,7 +240,11 @@ export function PropagationTab() {
             {result.geoNodes.length > 0 ? (
               <Section
                 title={`Locations worldwide — ${result.recordType} records (${result.summary.geoResolved}/${result.summary.geoTotal} resolved)`}
-                description={`Live measurements from servers in different countries, powered by check-host.net's free public API.`}
+                description={
+                  result.geoProvider === 'check-host.net'
+                    ? "Live measurements from servers in different countries, powered by check-host.net's public API."
+                    : 'Live measurements from regional DNS vantage points across countries worldwide.'
+                }
               >
                 <GeoGrid nodes={result.geoNodes} />
               </Section>
@@ -257,7 +280,7 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card">
+    <div className="rounded-xl border bg-card shadow-xs">
       <div className="border-b px-4 py-3">
         <h3 className="text-sm font-semibold">{title}</h3>
         {description ? <p className="mt-0.5 text-[11.5px] text-muted-foreground">{description}</p> : null}
@@ -269,33 +292,53 @@ function Section({ title, description, children }: { title: string; description?
 
 function StatusCell({ status }: { status: string }) {
   if (status === 'resolved' || status === 'healthy') {
-    return <CheckCircle2 className="h-5 w-5 text-emerald-500" aria-label="Resolved" />;
+    return <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" aria-label="Resolved" />;
   }
   if (status === 'warning' || status === 'timeout' || status === 'unknown') {
-    return <RefreshCw className="h-4.5 w-4.5 text-amber-500" aria-label="Divergent or timed out" />;
+    return <AlertCircle className="h-5 w-5 shrink-0 text-amber-500" aria-label="Divergent or timed out" />;
   }
   if (status === 'empty' || status === 'not_configured') {
-    return <span className="rounded-full border px-2 py-0.5 text-[10px] font-medium text-muted-foreground">EMPTY</span>;
+    return <span className="rounded-full border border-muted-foreground/30 bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">EMPTY</span>;
   }
-  return <XCircle className="h-5 w-5 text-red-500" aria-label="Failed" />;
+  return <XCircle className="h-5 w-5 shrink-0 text-red-500" aria-label="Failed" />;
 }
 
 function GeoGrid({ nodes }: { nodes: GeoNode[] }) {
   return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
       {nodes.map((n) => (
-        <div key={n.node} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium">
-              {flagEmoji(n.countryCode)} {n.city}, {n.country}
+        <div
+          key={n.node}
+          className="group flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-card p-3 shadow-xs transition-all hover:border-emerald-500/40 hover:bg-muted/30"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 truncate text-[13px] font-medium text-foreground">
+              <span className="text-base leading-none">{flagEmoji(n.countryCode)}</span>
+              <span className="truncate">{n.city}, {n.country}</span>
             </p>
-            <p className="truncate font-mono text-[11.5px] text-muted-foreground" title={n.values?.join(', ')}>
-              {n.values ? n.values.join(', ') : n.status === 'timeout' ? 'No result in time' : n.status === 'empty' ? 'No record' : 'Failed'}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              {n.values && n.values.length > 0 ? (
+                n.values.map((val) => (
+                  <span
+                    key={val}
+                    className="inline-block rounded-md border border-border/80 bg-muted/70 px-1.5 py-0.5 font-mono text-[11.5px] font-medium text-foreground"
+                    title={val}
+                  >
+                    {val}
+                  </span>
+                ))
+              ) : (
+                <span className="font-mono text-[11.5px] text-muted-foreground">
+                  {n.status === 'timeout' ? 'Timed out' : n.status === 'empty' ? 'No record' : 'Failed'}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {n.matchesExpected === false ? <Failed className="hidden" /> : null}
-            {n.ttl ? <span className="text-[10px] text-muted-foreground">TTL {n.ttl}</span> : null}
+            {n.matchesExpected === false ? (
+              <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-red-600 dark:text-red-400">Mismatch</span>
+            ) : null}
+            {n.ttl ? <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">TTL {n.ttl}</span> : null}
             <StatusCell status={n.status} />
           </div>
         </div>
@@ -306,23 +349,39 @@ function GeoGrid({ nodes }: { nodes: GeoNode[] }) {
 
 function NetworkGrid({ networks }: { networks: NetworkNode[] }) {
   return (
-    <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
       {networks.map((n) => (
-        <div key={n.ip} className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2">
-          <div className="min-w-0">
-            <p className="truncate text-[13px] font-medium">
-              {flagEmoji(n.countryCode)} {n.name}
+        <div
+          key={n.ip}
+          className="group flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-card p-3 shadow-xs transition-all hover:border-emerald-500/40 hover:bg-muted/30"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-1.5 truncate text-[13px] font-medium text-foreground">
+              <span className="text-base leading-none">{flagEmoji(n.countryCode)}</span>
+              <span className="truncate">{n.name}</span>
             </p>
-            <p className="truncate font-mono text-[11.5px] text-muted-foreground" title={n.values?.join(', ')}>
-              {n.values
-                ? n.values.join(', ')
-                : n.status === 'not_configured'
-                  ? `No record (${n.responseCode})`
-                  : `${n.responseCode}${n.status === 'critical' ? ' — domain does not exist here' : ''}`}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
+              {n.values && n.values.length > 0 ? (
+                n.values.map((val) => (
+                  <span
+                    key={val}
+                    className="inline-block rounded-md border border-border/80 bg-muted/70 px-1.5 py-0.5 font-mono text-[11.5px] font-medium text-foreground"
+                    title={val}
+                  >
+                    {val}
+                  </span>
+                ))
+              ) : (
+                <span className="font-mono text-[11.5px] text-muted-foreground">
+                  {n.status === 'not_configured'
+                    ? `No record (${n.responseCode})`
+                    : `${n.responseCode}${n.status === 'critical' ? ' — domain does not exist here' : ''}`}
+                </span>
+              )}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {n.responseTimeMs !== null ? <span className="text-[10px] tabular-nums text-muted-foreground">{n.responseTimeMs} ms</span> : null}
+            {n.responseTimeMs !== null ? <span className="rounded bg-muted/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{n.responseTimeMs} ms</span> : null}
             <StatusCell status={n.status} />
           </div>
         </div>

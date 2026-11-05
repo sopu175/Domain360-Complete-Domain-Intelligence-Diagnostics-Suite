@@ -10,7 +10,7 @@ export type ModuleId =
   | 'overview' | 'dns' | 'propagation' | 'propagationWorld' | 'nameservers' | 'ip' | 'ssl'
   | 'whois' | 'email' | 'http' | 'security' | 'subdomains' | 'dnssec';
 
-export type TabId = ModuleId | 'compare' | 'reports' | 'settings';
+export type TabId = ModuleId | 'compare' | 'reports';
 
 export interface ModuleEntry {
   status: 'idle' | 'loading' | 'ok' | 'error';

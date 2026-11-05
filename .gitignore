@@ -1,7 +1,5 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-node_modules
+# Dependencies
+node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -10,45 +8,64 @@ node_modules
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-
-# next.js
+# Next.js Build & Outputs
 /.next/
 /out/
+/build/
 
-# production
-/build
+# Testing & Coverage
+/coverage/
 
-# misc
+# IDE & Editor Files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
 .DS_Store
-*.pem
+Thumbs.db
 
-# debug
+# Environment Files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel/
+
+# TypeScript & Cache
+*.tsbuildinfo
+next-env.d.ts
+
+# Logs
+*.log
+dev.log
+dev.out.log
+server.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-
-# vercel
-.vercel
-
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
+# Local Scratch & Temporary
 local-*
-.claude
-.z-ai-config
-*.log
-dev.log
-dev.out.log
-test
-prompt
-
-server.log
-# Skills directory
+.claude/
+.z-ai-config/
+test/
+prompt/
 /skills/
+
+# Legacy Boilerplate & Unused Scaffolding
+.zscripts/
+mini-services/
+download/
+examples/
+tests/
+Caddyfile
+*.pid
+
+# SQLite Journal & Temporary Files
+*.db-journal
+*.sqlite-journal

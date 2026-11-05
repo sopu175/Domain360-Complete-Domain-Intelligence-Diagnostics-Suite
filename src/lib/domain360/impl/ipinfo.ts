@@ -88,81 +88,83 @@ async function ptrFor(ip: string): Promise<string | null> {
   }
 }
 
-async function enrichIp(ip: string): Promise<IpDetail> {
-  const version = isIP(ip) === 6 ? 6 : 4;
-  const ptr = await ptrFor(ip);
+export async function enrichIp(ip: string): Promise<IpDetail> {
+  return cached(`ipenrich:${ip}`, TTL.ipinfo, async (): Promise<IpDetail> => {
+    const version = isIP(ip) === 6 ? 6 : 4;
+    const ptr = await ptrFor(ip);
 
-  let detail: IpDetail = {
-    ip, version, ptr,
-    asn: null, asnOrg: null, isp: null, org: null, providerDomain: null,
-    country: null, countryCode: null, region: null, city: null,
-    latitude: null, longitude: null, postal: null, timezone: null,
-    ipType: 'unknown', source: 'unavailable',
-  };
+    let detail: IpDetail = {
+      ip, version, ptr,
+      asn: null, asnOrg: null, isp: null, org: null, providerDomain: null,
+      country: null, countryCode: null, region: null, city: null,
+      latitude: null, longitude: null, postal: null, timezone: null,
+      ipType: 'unknown', source: 'unavailable',
+    };
 
-  try {
-    const res = await fetch(`https://ipwho.is/${ip}`, {
-      signal: AbortSignal.timeout(TIMEOUTS.ipinfo),
-      cache: 'no-store',
-    });
-    const j = (await res.json()) as IpwhoResponse;
-    if (j.success !== false) {
-      const org = j.connection?.org || j.connection?.isp || null;
-      detail = {
-        ...detail,
-        asn: j.connection?.asn ? `AS${j.connection.asn}` : null,
-        asnOrg: j.connection?.org || null,
-        isp: j.connection?.isp || null,
-        org,
-        providerDomain: j.connection?.domain || null,
-        country: j.country || null,
-        countryCode: j.country_code || null,
-        region: j.region || null,
-        city: j.city || null,
-        latitude: j.latitude ?? null,
-        longitude: j.longitude ?? null,
-        postal: j.postal || null,
-        timezone: typeof j.timezone === 'string' ? j.timezone : j.timezone?.id || null,
-        ipType: classifyIpType(org, j.connection?.isp || null),
-        source: 'ipwho.is',
-      };
-    }
-  } catch {
-    /* fall through to ip-api */
-  }
-
-  if (detail.source === 'unavailable') {
     try {
-      const res = await fetch(
-        `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,hosting,reverse`,
-        { signal: AbortSignal.timeout(TIMEOUTS.ipinfo), cache: 'no-store' },
-      );
-      const j = (await res.json()) as IpApiResponse;
-      if (j.status === 'success') {
-        const org = j.org || j.isp || null;
+      const res = await fetch(`https://ipwho.is/${ip}`, {
+        signal: AbortSignal.timeout(TIMEOUTS.ipinfo),
+        cache: 'no-store',
+      });
+      const j = (await res.json()) as IpwhoResponse;
+      if (j.success !== false) {
+        const org = j.connection?.org || j.connection?.isp || null;
         detail = {
           ...detail,
-          asn: j.as ? j.as.split(' ')[0] : null,
-          asnOrg: j.as || null,
-          isp: j.isp || null,
+          asn: j.connection?.asn ? `AS${j.connection.asn}` : null,
+          asnOrg: j.connection?.org || null,
+          isp: j.connection?.isp || null,
           org,
+          providerDomain: j.connection?.domain || null,
           country: j.country || null,
-          countryCode: j.countryCode || null,
-          region: j.regionName || null,
+          countryCode: j.country_code || null,
+          region: j.region || null,
           city: j.city || null,
-          latitude: j.lat ?? null,
-          longitude: j.lon ?? null,
-          postal: j.zip || null,
-          timezone: j.timezone || null,
-          ipType: j.hosting ? 'hosting' : classifyIpType(org, j.isp || null),
-          source: 'ip-api.com',
+          latitude: j.latitude ?? null,
+          longitude: j.longitude ?? null,
+          postal: j.postal || null,
+          timezone: typeof j.timezone === 'string' ? j.timezone : j.timezone?.id || null,
+          ipType: classifyIpType(org, j.connection?.isp || null),
+          source: 'ipwho.is',
         };
       }
     } catch {
-      /* leave unavailable */
+      /* fall through to ip-api */
     }
-  }
-  return detail;
+
+    if (detail.source === 'unavailable') {
+      try {
+        const res = await fetch(
+          `http://ip-api.com/json/${ip}?fields=status,message,country,countryCode,regionName,city,zip,lat,lon,timezone,isp,org,as,hosting,reverse`,
+          { signal: AbortSignal.timeout(TIMEOUTS.ipinfo), cache: 'no-store' },
+        );
+        const j = (await res.json()) as IpApiResponse;
+        if (j.status === 'success') {
+          const org = j.org || j.isp || null;
+          detail = {
+            ...detail,
+            asn: j.as ? j.as.split(' ')[0] : null,
+            asnOrg: j.as || null,
+            isp: j.isp || null,
+            org,
+            country: j.country || null,
+            countryCode: j.countryCode || null,
+            region: j.regionName || null,
+            city: j.city || null,
+            latitude: j.lat ?? null,
+            longitude: j.lon ?? null,
+            postal: j.zip || null,
+            timezone: j.timezone || null,
+            ipType: j.hosting ? 'hosting' : classifyIpType(org, j.isp || null),
+            source: 'ip-api.com',
+          };
+        }
+      } catch {
+        /* leave unavailable */
+      }
+    }
+    return detail;
+  });
 }
 
 export async function lookupIpInfo(input: { query: string; isIp: 0 | 4 | 6 }): Promise<IpResult> {

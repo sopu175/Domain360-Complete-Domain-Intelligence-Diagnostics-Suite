@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (e) {
     console.error('[domain360:history]', (e as Error).message);
-    return jsonError('INTERNAL_ERROR', 'Could not load history.', 500);
+    return jsonOk({ items: [] });
   }
 }
 

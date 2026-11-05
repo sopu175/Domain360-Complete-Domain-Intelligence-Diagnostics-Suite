@@ -3,6 +3,7 @@ import dns from 'node:dns';
 import { cached, TTL } from '../cache';
 import { COMMON_DKIM_SELECTORS, MAIL_PROVIDERS, TIMEOUTS } from '../config';
 import { resolveHostIps, smartResolve } from '../resolver';
+import { enrichIp } from './ipinfo';
 import type { EmailMx, EmailResult, Finding } from '../types';
 
 function finding(id: string, title: string, severity: Finding['severity'], description: string, recommendation?: string, reference?: string): Finding {
@@ -91,6 +92,19 @@ export async function analyzeEmail(input: { ascii: string; selectors?: string[] 
           const hay = `${m.exchange} ${ptr || ''}`.toLowerCase();
           const provider = MAIL_PROVIDERS.find((mp) => mp.patterns.some((p) => hay.includes(p)));
           const smtp = ips[0] ? await smtpProbe(ips[0].ip).catch(() => ({ reachable: null, banner: null })) : { reachable: null, banner: null };
+          let country: string | null = null;
+          let countryCode: string | null = null;
+          let city: string | null = null;
+          if (ips[0]) {
+            try {
+              const geo = await enrichIp(ips[0].ip);
+              country = geo.country;
+              countryCode = geo.countryCode;
+              city = geo.city;
+            } catch {
+              /* best effort */
+            }
+          }
           mxRecords.push({
             exchange: m.exchange,
             priority: m.priority,
@@ -99,6 +113,9 @@ export async function analyzeEmail(input: { ascii: string; selectors?: string[] 
             providerGuess: provider?.name || null,
             reachable: smtp.reachable,
             banner: smtp.banner,
+            country,
+            countryCode,
+            city,
           });
         }),
       );

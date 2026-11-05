@@ -85,6 +85,10 @@ export interface NsServerInfo {
   soaSerial: number | null;
   nsRecords: string[] | null;
   isLame: boolean;
+  country?: string | null;
+  countryCode?: string | null;
+  city?: string | null;
+  asnOrg?: string | null;
 }
 
 export interface NameserverResult {
@@ -225,6 +229,9 @@ export interface EmailMx {
   providerGuess: string | null;
   reachable: boolean | null;
   banner: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  city?: string | null;
 }
 
 export interface EmailResult {
@@ -333,6 +340,16 @@ export interface SecurityResult {
     vulnerable: boolean | null;
     servers: string[];
   } | null;
+  blacklists?: {
+    checked: number;
+    listed: number;
+    entries: {
+      name: string;
+      host: string;
+      listed: boolean;
+      details?: string;
+    }[];
+  };
   findings: Finding[];
   timestamp: string;
 }

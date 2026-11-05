@@ -3,8 +3,9 @@
 import { useState } from 'react';
 import { Database } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  CopyButton, DataTable, InfoGrid, ModuleShell, SectionCard, type TableColumn,
+  CopyButton, DataTable, DnsRecordBadge, InfoGrid, IpBadge, ModuleShell, SectionCard, type TableColumn,
 } from '@/components/domain360/shared-ui';
 import { useModuleData } from '@/lib/domain360/store';
 import type { DnsLookupResult } from '@/lib/domain360/types';
@@ -31,30 +32,94 @@ export function DnsTab() {
   const result = data as DnsLookupResult | undefined;
 
   const columns: TableColumn[] = [
-    { key: 'type', header: 'Type', className: 'w-24 font-semibold' },
+    { key: 'type', header: 'Type', className: 'w-28' },
     { key: 'name', header: 'Name', mono: true },
-    { key: 'value', header: 'Value / Answer', mono: true },
-    { key: 'ttl', header: 'TTL', className: 'w-20 tabular-nums' },
-    { key: 'prio', header: 'Priority', className: 'w-20 tabular-nums' },
+    { key: 'value', header: 'Value / Answer' },
+    { key: 'ttl', header: 'TTL', className: 'w-24 tabular-nums' },
+    { key: 'prio', header: 'Priority', className: 'w-24 tabular-nums' },
     { key: 'copy', header: '', className: 'w-10' },
   ];
 
+  const isIpValue = (val: string, rType: string) => {
+    if (rType === 'A' || rType === 'AAAA') return true;
+    return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(val) || (val.includes(':') && !val.includes(' '));
+  };
+
   const rows = (result?.records || []).map((r, i) => ({
     _key: `${i}-${r.value}`,
-    type: r.type,
-    name: r.name,
-    value: r.value,
-    ttl: r.ttl ?? '—',
-    prio: r.priority ?? '—',
+    type: <DnsRecordBadge type={r.type} />,
+    name: <span className="font-mono text-[12px]">{r.name}</span>,
+    value: isIpValue(r.value, r.type) ? (
+      <IpBadge ip={r.value} version={r.type === 'AAAA' ? 6 : 4} />
+    ) : (
+      <span className="font-mono text-[12.5px] break-all">{r.value}</span>
+    ),
+    ttl:
+      r.ttl !== null ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[11px] tabular-nums underline decoration-dotted decoration-muted-foreground/50 underline-offset-2">
+              {r.ttl}s
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="font-semibold text-xs">Time To Live (TTL)</p>
+            <p className="text-[11px] text-muted-foreground">
+              Cached for {r.ttl} seconds before resolvers re-query authoritative nameservers.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        '—'
+      ),
+    prio:
+      r.priority !== undefined && r.priority !== null ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[11px] font-semibold tabular-nums text-foreground underline decoration-dotted decoration-muted-foreground/50 underline-offset-2">
+              {r.priority}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="font-semibold text-xs">MX Delivery Priority</p>
+            <p className="text-[11px] text-muted-foreground">
+              Priority level {r.priority}. Lower numeric values indicate higher delivery preference.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        '—'
+      ),
     copy: <CopyButton value={r.value} />,
   }));
 
   const authRows = (result?.authority || []).map((r, i) => ({
     _key: `auth-${i}-${r.value}`,
-    type: r.type,
-    name: r.name,
-    value: r.value,
-    ttl: r.ttl ?? '—',
+    type: <DnsRecordBadge type={r.type} />,
+    name: <span className="font-mono text-[12px]">{r.name}</span>,
+    value: isIpValue(r.value, r.type) ? (
+      <IpBadge ip={r.value} version={r.type === 'AAAA' ? 6 : 4} />
+    ) : (
+      <span className="font-mono text-[12.5px] break-all">{r.value}</span>
+    ),
+    ttl:
+      r.ttl !== null ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-help rounded bg-muted/70 px-1.5 py-0.5 font-mono text-[11px] tabular-nums underline decoration-dotted decoration-muted-foreground/50 underline-offset-2">
+              {r.ttl}s
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p className="font-semibold text-xs">Time To Live (TTL)</p>
+            <p className="text-[11px] text-muted-foreground">
+              Cached for {r.ttl} seconds.
+            </p>
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        '—'
+      ),
     prio: '—',
     copy: <CopyButton value={r.value} />,
   }));

@@ -22,7 +22,6 @@ import { SubdomainsTab } from '@/components/domain360/subdomains-tab';
 import { DnssecTab } from '@/components/domain360/dnssec-tab';
 import { CompareTab } from '@/components/domain360/compare-tab';
 import { ReportsTab } from '@/components/domain360/reports-tab';
-import { SettingsTab } from '@/components/domain360/settings-tab';
 
 function TabContent() {
   const activeTab = useStore((s) => s.activeTab);
@@ -41,7 +40,6 @@ function TabContent() {
     case 'dnssec': return <DnssecTab />;
     case 'compare': return <CompareTab />;
     case 'reports': return <ReportsTab />;
-    case 'settings': return <SettingsTab />;
     default: return <OverviewTab />;
   }
 }

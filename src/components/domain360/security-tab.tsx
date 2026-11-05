@@ -66,6 +66,29 @@ export function SecurityTab() {
             </div>
           </div>
 
+          {/* Blacklist / Threat Reputation section */}
+          {result.blacklists && result.blacklists.entries.length > 0 ? (
+            <SectionCard
+              title="Threat Reputation & Blacklist Audit (DNSBL)"
+              description={`Queried ${result.blacklists.checked} industry blacklist databases (Spamhaus, SpamCop, Barracuda, SORBS).`}
+            >
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                {result.blacklists.entries.map((entry) => (
+                  <div
+                    key={entry.name}
+                    className="flex items-center justify-between gap-2.5 rounded-xl border border-border/70 bg-card p-3 shadow-xs"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[13px] font-medium">{entry.name}</p>
+                      <p className="truncate font-mono text-[11px] text-muted-foreground">{entry.host}</p>
+                    </div>
+                    <StatusBadge status={entry.listed ? 'critical' : 'healthy'} />
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
+          ) : null}
+
           <SectionCard title="Security findings" description="Severity-ordered with explanations and concrete fixes.">
             <FindingList findings={result.findings} />
           </SectionCard>

@@ -1,6 +1,7 @@
 import { cached, TTL } from '../cache';
 import { wireQuery } from '../dns-wire';
 import { resolveHostIps, smartResolve } from '../resolver';
+import { enrichIp } from './ipinfo';
 import type { Finding, NameserverResult, NsServerInfo } from '../types';
 
 const clean = (s: string): string => s.replace(/\.$/, '').toLowerCase();
@@ -120,8 +121,25 @@ export async function analyzeNameservers(input: { ascii: string }): Promise<Name
             continue;
           }
         }
+        let country: string | null = null;
+        let countryCode: string | null = null;
+        let city: string | null = null;
+        let asnOrg: string | null = null;
+
+        if (ips.length > 0) {
+          try {
+            const geo = await enrichIp(ips[0]);
+            country = geo.country;
+            countryCode = geo.countryCode;
+            city = geo.city;
+            asnOrg = geo.asnOrg || geo.org;
+          } catch {
+            /* best effort */
+          }
+        }
+
         const isLame = ips.length === 0 || !responded;
-        return { nameserver: ns, ips, responded, responseTimeMs, soaSerial, nsRecords, isLame };
+        return { nameserver: ns, ips, responded, responseTimeMs, soaSerial, nsRecords, isLame, country, countryCode, city, asnOrg };
       }),
     );
 
