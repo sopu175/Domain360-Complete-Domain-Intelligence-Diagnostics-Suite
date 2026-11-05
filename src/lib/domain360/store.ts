@@ -2,11 +2,12 @@
 
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import { API, apiFetch } from './client';
+import { API, apiFetch, qs } from './client';
 import type { DnsLookupResult, HttpResult, IpResult, NameserverResult, OverviewResult, PropagationResult, SslResult, SubdomainResult, WhoisResult, DnssecResult, EmailResult, SecurityResult } from './types';
+import type { PropagationWorldResult } from './impl/propagation-geo';
 
 export type ModuleId =
-  | 'overview' | 'dns' | 'propagation' | 'nameservers' | 'ip' | 'ssl'
+  | 'overview' | 'dns' | 'propagation' | 'propagationWorld' | 'nameservers' | 'ip' | 'ssl'
   | 'whois' | 'email' | 'http' | 'security' | 'subdomains' | 'dnssec';
 
 export type TabId = ModuleId | 'compare' | 'reports' | 'settings';
@@ -28,6 +29,7 @@ export type ModuleResults = {
   overview: OverviewResult;
   dns: DnsLookupResult;
   propagation: PropagationResult;
+  propagationWorld: PropagationWorldResult;
   nameservers: NameserverResult;
   ip: IpResult;
   ssl: SslResult;
@@ -94,9 +96,11 @@ function endpointFor(id: ModuleId, domain: string, params?: Record<string, strin
   const type = params?.type;
   const resolver = params?.resolver;
   const source = params?.source;
+  const expected = params?.expected;
   switch (id) {
     case 'dns': return API.dns(domain, type || 'A', resolver);
     case 'propagation': return API.propagation(domain, type || 'A');
+    case 'propagationWorld': return `/api/domain360/propagation-world${qs({ domain, type: type || 'A', expected })}`;
     case 'nameservers': return API.nameservers(domain);
     case 'dnssec': return API.dnssec(domain);
     case 'ssl': return API.ssl(domain);
